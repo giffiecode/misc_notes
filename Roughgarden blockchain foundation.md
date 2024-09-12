@@ -1,0 +1,134 @@
+- 1.3  digital signature scheme (dss)
+    - consensus - machines (node) in sync 
+    - digital signature schemes  (dss) 
+        - 1/ key generation algorithm  (map random seed r)-> ( pk, sk) pair) 
+        - 2/ signing algorithm (maps msg + sk -> msg + sig) 
+        - 3/ verification algorithm (maps msg + sig + pk -> yes or no)  
+    - assumptions for ideal signature 
+        - don't know sk -> impossible to generate valid msg + sig 
+    - by default: 
+        - node sign all messsages that they send 
+    - permanent assumptions: 
+        - 1/ internet exists 
+        - 2/ cryptography exists  
+        - also 
+        - 1/ unreliability (delay, outages, attacks) 
+        - 2/ assume not every node is running the correct protocol     
+- 1.4  SMR - state machine replication   
+    - keeps all the copies in sync 
+    - two parties 
+        - node - run the protocol 
+        - client, customer, user  
+    - client sends txn to nodes 
+    - each node maintain a local append-only data structure (by ordered sequence of txs) 
+    - protocol definition: code telling the node what to do when something happens ( receive msg, send msg to other nodes)
+    - goals   
+        - consistency (some lag is fine)
+        - liveness: all txn submitted will eventually get processed 
+    - solve State Machine Replica problem four assumption  
+        - assumptions 
+            - permission - fixed set of node 
+            - everyone knows all public key 
+            - shared global clock 
+            - all honest - noone deviates from the protocol  (not just intention, also no down time)
+        - Rotating leaders (Round-Robin Leaders)
+            - leaders coordinate the nodes 
+            - send ordered sequence (leader sequence) of txn to all other nodes ("a block") 
+            - other nodes, receive, append to the append only data structure 
+            - satisfies consistency and liveness  
+            - operate in lock step 
+        - faulty / byzantine nodes 
+            - not honest is faulty 
+            - types of faulty nodes 
+                - crash fault (work up to t, then completely down) 
+                    - consistency v 
+                    - liveness x 
+                - omission fault (fail to deliver msg that the node is supposed to send) 
+                    - consistency x 
+                    - liveness v 
+                - byzantine fault (can behave arbitrarily, but can't break cryptography)  
+                    - canonical: send conflicting msgs to different nodes 
+                    - new assumption 4: at least <= f nodes are faulty, and n-f nodes are honest  
+                    - you don't know which nodes are byzantine, but we assume a static set of byzantine node    
+    - solve byzantine broadcast problem? - yes  
+        - consistency and liveness  
+        - use rotating leaders  
+        - subroutine: Byzantine Broadcast (BB) 
+            - one node is the sender (known to all upfront) 
+            - sender has a private input v*, which belongs to V (all msg the node wants to send out) 
+        - goals (only expecting these from the honest nodes) 
+            - termination: each honest node eventually halts with some value v*, in guess of what v* is 
+            - agreement: all honest nodes choose the same value vi;
+            - validity: if sender is honest, all honest vi is equal to v* 
+    - problem reduction: SMR reduces to BB problem 
+        - SMR protocols (correct means consistency and liveness)
+            - 1/ take turns as leaders 
+            - 2/ run BB protocol (with sender = leader), agree on txn list L  
+            - 3/ each nodes appends L to its local history 
+        - BB agreement -> SMR consistency  
+        - BB validity -> SMR liveness 
+- 2.3 simple protocols for byzantine broadcast 
+    - intuition: f = 1 case  
+    - proposed protocol: 
+        - t = 0: senders send its value v to all other nodes (signed, as always) 
+        - t = 1: nodes echo msg from sender to all other nodes (signed again)
+        - t = 2: each node i chooses output vi by majority vote  
+        - <= 1 vote from sender, <= n-2 vote from other non-senders 
+- lecture 2-7 
+    - tendermint protocol + provable guarantees ( consistency + eventual liveness )   
+    - partially synchronous model  - need 67% honest - cap theorem  
+    - asynchronous model  
+        - FLP impossibility - consensus is impossible in asynchronous model  
+    - synchronous model (dolev-strong protocol - byzantine broadcast, smr) 
+        - remarkable of doler-strong: tolerate a arbitrary amount of dishonest node 
+        - too strong assumption for guarantee msg delivery    
+        - PKI assumption - public key infrastructure assumption  - hexagon proof 
+    - BFT - byzantine fault tolerant - safety  
+        - stop making progress 
+    - longest chain protocol  - liveness 
+        - reorg attack - massive rollback of txn favoring a different batch of txn  
+- lecture 2   
+    - byzantine broadcast in synchronous model via dolev-strong protocol 
+    - SMR problem solving goal 
+        - consistency 
+        - liveness 
+    - plan: solve first under assumptions then relax assumptions one by one 
+    - 4 assumptions: 
+        - permissioned setting (nodes are pre-known, by ip addresses).  
+        - PKI 
+        - synchronous model  
+            - i) all nodes share a global clock 
+            - ii) all msg sent at t will arrive by t+1 (in arbitrary order) 
+        - all honest nodes: no deviation from the protocol code || f = # of byzantine node  
+    - liveness, safety, consistency -> don't all hold under attack (eg. ddos) when we lose synchronicity   
+    - solution via round-robin leaders 
+        - rotating leader construct each block  
+        - send ordered list txn to all other nodes - a block  
+    -  satisfies consistency (nodes operate in lockstep) + liveness (txn eventually get added) 
+    - faulty/byzantine nodes  
+        - type of faulty nodes: 
+            - crash fault   
+                - no more message sent 
+            - omission fault  
+                - can selectively withhold messages it's supposed to send  
+                - violates consistency 
+            - byzantine fault  
+                - can behave arbitrarily  
+                - canonical play: send conflicting message to different nodes 
+    - new assumption: at most f faulty nodes are byzantine, and other n-f nodes are honet
+    - assume static set of byzantine nodes     
+    - BB subroutine: byzantine broadcast problem (BB)  
+        - same four assumptions 
+        - one node is the sender (known to all up-front)
+        - send has a private input v* 
+        - goals  
+            - termination: each honest node eventually halt with some value vi   
+            - agreement: all honest node choose the same value vi   
+            - validity: if sender is honest, all honest vi is equal v* 
+        - SMR reduces to BB subroutine  (given a byzantine broadcast subroutine)
+            - take turns as leader (eg. round-robin)  
+            -  run bb protocol (with sender=current leader), agree on a txn list L  
+            - each node appends L to its local history  
+        - Why this reduction works? 
+            -  BB agreement -> SMR consistency (every two steps, all honest nodes add the same txn list)
+            - BB validity -> SMR liveness (if honest node knows about a txn, eventually will become the leader -> all other honest nodes to add that txn) 
